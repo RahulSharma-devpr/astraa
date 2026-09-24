@@ -14,10 +14,13 @@ export default function Header({ status }) {
   return (
     <header className="mission-header">
       <div className="mission-brand">
-        <span className="mark">
-          ASTR<span>AA</span>
-        </span>
-        <span className="tagline">Autonomous Spacecraft Threat &amp; Recovery AI Assistant</span>
+        <div>
+          <span className="mark">
+            ASTR<span>AA</span>
+          </span>
+          <span className="tagline">Autonomous Spacecraft Threat &amp; Recovery AI Assistant</span>
+          <span className="team-name">BOB THE BUILD07 · SIH 2026</span>
+        </div>
       </div>
       <div className="mission-meta">
         <span>
