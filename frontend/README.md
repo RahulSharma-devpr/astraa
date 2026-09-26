@@ -58,14 +58,21 @@ that pushes real telemetry frames, and feed real anomaly-detector output into
 
 ## How the AI assistant works
 
-`src/utils/aiResponses.js` is a small intent matcher (status / diagnose /
-recover / log / greeting) that is deliberately model-agnostic — swap
-`answerQuery()` for a real LLM call (e.g. the Anthropic API) once you have a
-backend and an API key, keeping the same function signature. `src/hooks/
-useVoiceAssistant.js` handles wake-word detection, continuous listening,
-language detection (Devanagari script or common Hindi transliterations →
-Hindi; otherwise English), and bilingual text-to-speech with a female voice
-picked from whatever voices the browser exposes.
+Chat requests go through `/api/astraa` to the backend, which calls OpenRouter
+without exposing the API key to the browser. Set `OPENROUTER_API_KEY` in
+`backend/.env` for local use; the Vite dev server proxies `/api` to the
+backend on port 5000. GitHub Pages hosts only the frontend, so deploy the
+backend separately. The root `render.yaml` can create it on Render; set
+`OPENROUTER_API_KEY` as a secret in the Render service environment. Then add a
+GitHub Actions repository variable named `VITE_BACKEND_URL` with the backend
+endpoint, for example `https://your-service.onrender.com/api/astraa`, and
+rerun the Pages deployment workflow. The Pages workflow embeds this URL during
+the frontend build. The model receives the user's question, current telemetry,
+active faults, and recent black-box events, then returns a spoken reply and an
+optional recovery action. `src/hooks/useVoiceAssistant.js` handles wake-word
+detection, language detection, and bilingual text-to-speech. `src/utils/
+aiResponses.js` remains the local intent-matching fallback when the backend
+cannot be reached.
 
 ## Project structure
 

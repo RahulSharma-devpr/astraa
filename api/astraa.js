@@ -8,8 +8,10 @@ the user used. Keep answers short, calm, and mission-control-style
 (like a flight controller reading out a status), since replies will be
 spoken aloud.
 
-You will be given the current spacecraft telemetry state and a user
-message. Decide:
+You will be given the current spacecraft telemetry state, active faults,
+recent black-box events, and a user message. Answer the user's actual
+question using that context. Do not invent telemetry, faults, or completed
+recovery actions. Decide:
 1. A short spoken reply ("reply").
 2. Whether a recovery action should be triggered right now ("action":
    either null, or one of: "resolveFault", "reroutePower", "stabilizeAttitude", "restartComms").
@@ -23,8 +25,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { message, telemetry, language } = req.body || {}
+  const { message, telemetry, activeFaults = [], log = [], language } = req.body || {}
   const apiKey = process.env.OPENROUTER_API_KEY
+
+  if (typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ error: 'A non-empty message is required.' })
+  }
 
   if (!apiKey) {
     return res.json({
@@ -51,7 +57,11 @@ export default async function handler(req, res) {
           { role: 'system', content: SYSTEM_PROMPT },
           {
             role: 'user',
-            content: `Telemetry: ${JSON.stringify(telemetry)}\nUser (${language || 'en'}): ${message}`,
+            content: `Spacecraft context (JSON): ${JSON.stringify({
+              telemetry,
+              activeFaults,
+              recentEvents: log.slice(0, 10),
+            })}\nUser (${language || 'en'}): ${message.trim()}`,
           },
         ],
       }),

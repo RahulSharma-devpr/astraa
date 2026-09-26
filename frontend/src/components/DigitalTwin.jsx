@@ -9,9 +9,10 @@ const HEALTH_CSS = { nominal: 'nominal', warning: 'warning', critical: 'critical
 // ---- Unmanned-satellite hull (unchanged from original) ----
 function buildSatelliteModel() {
   const craft = new THREE.Group()
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1c2434, metalness: 0.4, roughness: 0.55 })
-  const trimMat = new THREE.MeshStandardMaterial({ color: 0x2a3448, metalness: 0.5, roughness: 0.4 })
-  const panelMat = new THREE.MeshStandardMaterial({ color: 0x123044, metalness: 0.2, roughness: 0.35, emissive: 0x0a1a26 })
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xc1a56e, metalness: 0.36, roughness: 0.48 })
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0xb4bec4, metalness: 0.76, roughness: 0.25 })
+  const panelMat = new THREE.MeshStandardMaterial({ color: 0x124b8c, metalness: 0.32, roughness: 0.26, emissive: 0x06182e })
+  const panelGridMat = new THREE.MeshBasicMaterial({ color: 0x88b7e5, transparent: true, opacity: 0.68 })
 
   const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.2, 1.7), bodyMat)
   craft.add(body)
@@ -24,8 +25,13 @@ function buildSatelliteModel() {
   craft.add(panelL, panelR)
   ;[panelL, panelR].forEach((p) => {
     for (let i = -2; i <= 2; i++) {
-      const line = new THREE.Mesh(new THREE.BoxGeometry(0.02, 1.5, 0.052), new THREE.MeshBasicMaterial({ color: 0x0a1a26 }))
+      const line = new THREE.Mesh(new THREE.BoxGeometry(0.018, 1.5, 0.052), panelGridMat)
       line.position.set(i * 0.5, 0, 0)
+      p.add(line)
+    }
+    for (let i = -1; i <= 1; i++) {
+      const line = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.018, 0.052), panelGridMat)
+      line.position.set(0, i * 0.38, 0)
       p.add(line)
     }
   })
@@ -46,7 +52,10 @@ function buildSatelliteModel() {
   payloadBox.position.set(1.05, 0.15, 0.6)
   craft.add(payloadBox)
 
-  const radiator = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x2a3448 }))
+  const radiator = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.1, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x9da9a8, metalness: 0.62, roughness: 0.4 })
+  )
   radiator.position.set(0, -1.15, 0.65)
   craft.add(radiator)
 
@@ -58,7 +67,7 @@ function buildSatelliteModel() {
   thrusterR.position.x = 0.4
   craft.add(thrusterL, thrusterR)
 
-  const flameMat = new THREE.MeshBasicMaterial({ color: 0x3ed6c4, transparent: true, opacity: 0.6 })
+  const flameMat = new THREE.MeshBasicMaterial({ color: 0x9fdcff, transparent: true, opacity: 0.58 })
   const flameGeo = new THREE.ConeGeometry(0.12, 0.4, 10)
   const flameL = new THREE.Mesh(flameGeo, flameMat)
   flameL.position.set(-0.4, -2.05, 0)
@@ -84,10 +93,10 @@ function buildSpacecraftModel() {
   const craft = new THREE.Group()
   craft.rotation.x = Math.PI / 2 // lay the tapered cylinder on its side, nose forward
 
-  const hullMat = new THREE.MeshStandardMaterial({ color: 0x161c2a, metalness: 0.6, roughness: 0.35 })
-  const trimMat = new THREE.MeshStandardMaterial({ color: 0x2a3448, metalness: 0.6, roughness: 0.3 })
+  const hullMat = new THREE.MeshStandardMaterial({ color: 0xc7ced0, metalness: 0.5, roughness: 0.29 })
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x394853, metalness: 0.72, roughness: 0.27 })
   const glowMat = new THREE.MeshBasicMaterial({ color: 0x3ed6c4 })
-  const canopyMat = new THREE.MeshStandardMaterial({ color: 0x0d1420, metalness: 0.2, roughness: 0.1, emissive: 0x123044 })
+  const canopyMat = new THREE.MeshStandardMaterial({ color: 0x193a50, metalness: 0.36, roughness: 0.14, emissive: 0x0a1d2c })
 
   // Faceted main fuselage — low radial segments (6) gives it angled-panel look
   // instead of a smooth round hull
@@ -106,7 +115,7 @@ function buildSpacecraftModel() {
 
   // Glowing seam rings where hull sections meet — classic sci-fi detailing
   ;[1.85, -1.6].forEach((y) => {
-    const seam = new THREE.Mesh(new THREE.TorusGeometry(y > 0 ? 0.34 : 0.76, 0.02, 6, 6), glowMat)
+    const seam = new THREE.Mesh(new THREE.TorusGeometry(y > 0 ? 0.34 : 0.76, 0.02, 6, 6), trimMat)
     seam.position.y = y
     seam.rotation.x = Math.PI / 2
     craft.add(seam)
@@ -136,7 +145,8 @@ function buildSpacecraftModel() {
 
   // Wingtip running lights
   ;[-2.6, 2.6].forEach((x) => {
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), glowMat)
+    const lightMat = new THREE.MeshBasicMaterial({ color: x < 0 ? 0xff4a45 : 0x52e28a })
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), lightMat)
     tip.position.set(x, -0.75, 0)
     craft.add(tip)
   })
@@ -175,7 +185,10 @@ function buildSpacecraftModel() {
   craft.add(payloadPod)
 
   // Radiator fin along the belly
-  const radiator = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 0.05), new THREE.MeshStandardMaterial({ color: 0x2a3448 }))
+  const radiator = new THREE.Mesh(
+    new THREE.BoxGeometry(1.1, 0.7, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0x78868a, metalness: 0.52, roughness: 0.44 })
+  )
   radiator.position.set(0, -0.9, 0.55)
   craft.add(radiator)
 
@@ -193,7 +206,7 @@ function buildSpacecraftModel() {
     craft.add(engine)
     const flame = new THREE.Mesh(
       new THREE.ConeGeometry(0.11, 0.4, 6),
-      new THREE.MeshBasicMaterial({ color: 0x3ed6c4, transparent: true, opacity: 0.6 })
+      new THREE.MeshBasicMaterial({ color: 0x9fdcff, transparent: true, opacity: 0.58 })
     )
     flame.position.set(x, -2.85, z)
     craft.add(flame)

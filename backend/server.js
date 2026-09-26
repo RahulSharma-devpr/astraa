@@ -12,6 +12,10 @@ const PORT = process.env.PORT || 5000;
 const API_KEY = process.env.OPENROUTER_API_KEY;
 const MODEL = "anthropic/claude-sonnet-4.5";
 
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
 const SYSTEM_PROMPT = `
 You are ASTRAA — Autonomous Spacecraft Threat & Recovery AI Assistant,
 a mission-control AI voice assistant for a student spacecraft simulation
@@ -20,8 +24,10 @@ the user used. Keep answers short, calm, and mission-control-style
 (like a flight controller reading out a status), since replies will be
 spoken aloud.
 
-You will be given the current spacecraft telemetry state and a user
-message. Decide:
+You will be given the current spacecraft telemetry state, active faults,
+recent black-box events, and a user message. Answer the user's actual
+question using that context. Do not invent telemetry, faults, or completed
+recovery actions. Decide:
 1. A short spoken reply ("reply").
 2. Whether a recovery action should be triggered right now ("action":
    either null, or one of: "resolveFault", "reroutePower", "stabilizeAttitude", "restartComms").
@@ -32,7 +38,11 @@ Respond with ONLY valid JSON, no markdown, no extra text, in this shape:
 
 app.post("/api/astraa", async (req, res) => {
   try {
-    const { message, telemetry, language } = req.body;
+    const { message, telemetry, activeFaults = [], log = [], language } = req.body;
+
+    if (typeof message !== "string" || !message.trim()) {
+      return res.status(400).json({ error: "A non-empty message is required." });
+    }
 
     if (!API_KEY) {
       return res.json({
@@ -45,9 +55,11 @@ app.post("/api/astraa", async (req, res) => {
       });
     }
 
-    const userContent = `Telemetry: ${JSON.stringify(telemetry)}\nUser (${
-      language || "en"
-    }): ${message}`;
+    const userContent = `Spacecraft context (JSON): ${JSON.stringify({
+      telemetry,
+      activeFaults,
+      recentEvents: log.slice(0, 10),
+    })}\nUser (${language || "en"}): ${message.trim()}`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",

@@ -65,12 +65,13 @@ export function useVoiceAssistant({ telemetry, activeFaults, log, onTranscriptEn
       setThinking(true)
 
       try {
-        const { telemetry, activeFaults } = stateRef.current
+        const { telemetry, activeFaults, log } = stateRef.current
         const data = await askAstraaAI({
           message: rawText,
           lang,
           telemetry,
           activeFaults,
+          log,
         })
 
         const reply = data?.reply || (lang === 'hi' ? 'मुझे जवाब नहीं मिला।' : "I couldn't generate a response.")
