@@ -1,8 +1,4 @@
-// Lightweight intent matcher standing in for a real model call.
-// Swap `answerQuery` to call an LLM (Anthropic API, etc.) once you have a
-// backend key — the function signature is deliberately model-agnostic.
-// It now also returns `lastFaultId` so the caller can remember what was
-// last discussed and understand short follow-ups like "fix it".
+// Local trigger-and-response rules keep chat available without an API.
 
 const HINDI_HINT = /[\u0900-\u097F]|kya|kaise|batao|status\s*kya|thik|kharabi|theek|kro|karo/i
 
@@ -10,44 +6,29 @@ export function detectLanguage(text) {
   return HINDI_HINT.test(text) ? 'hi' : 'en'
 }
 
-function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)]
-}
-
 function fmtFault(fault, lang) {
   const steps = lang === 'hi' ? fault.recoveryHi : fault.recovery
   const numbered = steps.map((s, i) => `${i + 1}. ${s}`).join(' ')
   if (lang === 'hi') {
-    const lead = pick([
-      `मुझे एक समस्या मिली है — ${fault.title}.`,
-      `सावधान, ${fault.title} हो रहा है।`,
-      `यह देखिए: ${fault.title}.`,
-    ])
-    return `${lead} संभावित कारण: ${fault.likelyCause} सुझाई गई रिकवरी: ${numbered}`
+    return `सक्रिय समस्या: ${fault.title}. संभावित कारण: ${fault.likelyCause} रिकवरी: ${numbered}`
   }
-  const lead = pick([
-    `I'm tracking an issue — ${fault.title}.`,
-    `Here's what I found: ${fault.title}.`,
-    `Flagging this: ${fault.title}.`,
-  ])
-  return `${lead} Likely cause: ${fault.likelyCause} Recommended recovery: ${numbered}`
+  return `Active issue: ${fault.title}. Likely cause: ${fault.likelyCause} Recommended recovery: ${numbered}`
 }
 
 function statusReport(telemetry, activeFaults, lang) {
   const health = activeFaults.length === 0 ? (lang === 'hi' ? 'सामान्य' : 'nominal') : (lang === 'hi' ? 'ध्यान देने योग्य' : 'degraded')
   if (lang === 'hi') {
-    const lead = pick(['मिशन स्टेटस अपडेट —', 'यह रहा स्टेटस —', 'ठीक है, स्टेटस इस प्रकार है —'])
-    return `${lead} स्थिति ${health} है। बैटरी ${telemetry.batteryPercent.toFixed(0)} प्रतिशत, पेलोड तापमान ${telemetry.payloadTemp.toFixed(1)} डिग्री, लिंक मार्जिन ${telemetry.linkMargin.toFixed(1)} डेसिबल। सक्रिय अलर्ट: ${activeFaults.length}.`
+    return `मिशन स्थिति ${health} है। बैटरी ${telemetry.batteryPercent.toFixed(0)} प्रतिशत, पेलोड तापमान ${telemetry.payloadTemp.toFixed(1)} डिग्री, लिंक मार्जिन ${telemetry.linkMargin.toFixed(1)} डेसिबल। सक्रिय अलर्ट: ${activeFaults.length}.`
   }
-  const lead = pick(['Mission status update —', "Here's the current picture —", 'All right, current status —'])
-  return `${lead} status is ${health}. Battery at ${telemetry.batteryPercent.toFixed(0)} percent, payload temperature ${telemetry.payloadTemp.toFixed(1)} degrees, link margin ${telemetry.linkMargin.toFixed(1)} decibels. Active alerts: ${activeFaults.length}.`
+  return `Mission status is ${health}. Battery at ${telemetry.batteryPercent.toFixed(0)} percent, payload temperature ${telemetry.payloadTemp.toFixed(1)} degrees, link margin ${telemetry.linkMargin.toFixed(1)} decibels. Active alerts: ${activeFaults.length}.`
 }
 
 /**
  * @returns {{ text: string, lastFaultId: string|null }}
  */
-export function answerQuery({ text, lang, telemetry, activeFaults, log, context = {} }) {
+export function answerQuery({ text, lang, telemetry, activeFaults, log = [], context = {} }) {
   const t = text.toLowerCase()
+  const lastFaultId = context.lastFaultId ?? null
 
   const isFollowUp = /\b(it|that one|isse|ise|uska|isko)\b/i.test(t)
   if (isFollowUp && context.lastFaultId) {
@@ -55,16 +36,41 @@ export function answerQuery({ text, lang, telemetry, activeFaults, log, context 
     if (fault) return { text: fmtFault(fault, lang), lastFaultId: fault.id }
   }
 
-  if (/status|report|halat|स्थिति/i.test(t)) {
-    return { text: statusReport(telemetry, activeFaults, lang), lastFaultId: context.lastFaultId ?? null }
+  if (/battery|charge|voltage|बैटरी|चार्ज/i.test(t)) {
+    return {
+      text: lang === 'hi'
+        ? `बैटरी चार्ज ${telemetry.batteryPercent.toFixed(0)} प्रतिशत है।`
+        : `Battery charge is ${telemetry.batteryPercent.toFixed(0)} percent.`,
+      lastFaultId,
+    }
   }
 
-  if (/diagnos|anomaly|problem|kharabi|खराबी|galat|glt/i.test(t)) {
+  if (/temperature|thermal|heat|तापमान|गर्मी/i.test(t)) {
+    return {
+      text: lang === 'hi'
+        ? `पेलोड तापमान ${telemetry.payloadTemp.toFixed(1)} डिग्री है।`
+        : `Payload temperature is ${telemetry.payloadTemp.toFixed(1)} degrees.`,
+      lastFaultId,
+    }
+  }
+
+  if (/link|signal|communication|comms|antenna|लिंक|सिग्नल|संचार/i.test(t)) {
+    return {
+      text: lang === 'hi'
+        ? `संचार लिंक मार्जिन ${telemetry.linkMargin.toFixed(1)} डेसिबल है।`
+        : `Communications link margin is ${telemetry.linkMargin.toFixed(1)} decibels.`,
+      lastFaultId,
+    }
+  }
+
+  if (/status|report|halat|स्थिति|स्टेटस/i.test(t)) {
+    return { text: statusReport(telemetry, activeFaults, lang), lastFaultId }
+  }
+
+  if (/diagnos|anomaly|problem|fault|alert|issue|kharabi|खराबी|galat|glt|अलर्ट|समस्या/i.test(t)) {
     if (activeFaults.length === 0) {
       return {
-        text: lang === 'hi'
-          ? pick(['फिलहाल कोई सक्रिय एनोमली नहीं मिली, सब कुछ nominal है।', 'सब सिस्टम ठीक हैं, कोई अलर्ट नहीं मिला।'])
-          : pick(['No active anomalies right now — everything is nominal.', "All clear, I'm not tracking any faults at the moment."]),
+        text: lang === 'hi' ? 'कोई सक्रिय खराबी नहीं है। सभी सिस्टम सामान्य हैं।' : 'No active faults. All systems are nominal.',
         lastFaultId: null,
       }
     }
@@ -89,23 +95,32 @@ export function answerQuery({ text, lang, telemetry, activeFaults, log, context 
       text: lang === 'hi'
         ? `ब्लैक बॉक्स की हाल की एंट्री: ${recent || 'कोई हाल की घटना दर्ज नहीं।'}`
         : `Recent black-box entries: ${recent || 'no recent events logged.'}`,
-      lastFaultId: context.lastFaultId ?? null,
+      lastFaultId,
     }
   }
 
-  if (/hello|hi astraa|namaste|नमस्ते/i.test(t)) {
+  if (/\b(hello|hi|hey|namaste)\b|नमस्ते/i.test(t)) {
     return {
       text: lang === 'hi'
-        ? pick(['नमस्ते, मैं ASTRAA हूं। बताइए, क्या जानना चाहेंगे?', 'जी नमस्ते, मैं सुन रही हूं।'])
-        : pick(["Hello, I'm ASTRAA. What would you like to know?", "Hi there — I'm listening."]),
-      lastFaultId: context.lastFaultId ?? null,
+        ? 'नमस्ते, मैं ASTRAA हूं। स्टेटस, बैटरी, तापमान, संचार या रिकवरी के बारे में पूछें।'
+        : 'Hello, I am ASTRAA. Ask me about status, battery, temperature, communications, faults, or recovery.',
+      lastFaultId,
+    }
+  }
+
+  if (/help|what can you do|commands|मदद|क्या पूछ/i.test(t)) {
+    return {
+      text: lang === 'hi'
+        ? 'मैं मिशन स्थिति, बैटरी, तापमान, संचार लिंक, सक्रिय खराबी, रिकवरी और ब्लैक-बॉक्स लॉग बता सकती हूं।'
+        : 'I can report mission status, battery, temperature, communications, active faults, recovery steps, and recent black-box events.',
+      lastFaultId,
     }
   }
 
   return {
     text: lang === 'hi'
-      ? 'मुझे यह समझ नहीं आया। आप कह सकते हैं: "स्टेटस रिपोर्ट दो", "एनोमली डायग्नोज़ करो", या "रिकवरी सुझाओ"।'
-      : 'I didn\'t quite catch that. Try: "status report", "diagnose anomaly", or "recommend recovery".',
-    lastFaultId: context.lastFaultId ?? null,
+      ? 'यह अनुरोध समझ नहीं आया। मदद, स्टेटस, बैटरी, तापमान, खराबी या रिकवरी पूछें।'
+      : 'I did not recognize that request. Try help, status, battery, temperature, diagnose faults, or recovery.',
+    lastFaultId,
   }
 }

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { answerQuery, detectLanguage } from '../utils/aiResponses'
-import { askAstraaAI } from '../utils/llmClient'
 
 const WAKE_PATTERNS = [/hey\s*astraa/i, /wake\s*up\s*astraa/i, /uth\s*jao\s*astraa/i, /namaste\s*astraa/i]
 
@@ -36,7 +35,6 @@ export function useVoiceAssistant({ telemetry, activeFaults, log, onTranscriptEn
   const [awake, setAwake] = useState(false)
   const [lastHeard, setLastHeard] = useState('')
   const [speaking, setSpeaking] = useState(false)
-  const [thinking, setThinking] = useState(false)
   const [micEnabled, setMicEnabled] = useState(false)
 
   const recognitionRef = useRef(null)
@@ -60,46 +58,20 @@ export function useVoiceAssistant({ telemetry, activeFaults, log, onTranscriptEn
   }, [])
 
   const handleCommand = useCallback(
-    async (rawText) => {
+    (rawText) => {
       const lang = detectLanguage(rawText)
-      setThinking(true)
-
-      try {
-        const { telemetry, activeFaults, log } = stateRef.current
-        const data = await askAstraaAI({
-          message: rawText,
-          lang,
-          telemetry,
-          activeFaults,
-          log,
-        })
-
-        const reply = data?.reply || (lang === 'hi' ? 'मुझे जवाब नहीं मिला।' : "I couldn't generate a response.")
-        contextRef.current = { lastFaultId: data?.faultId ?? contextRef.current.lastFaultId ?? null }
-        setThinking(false)
-        onTranscriptEntry?.({ from: 'astraa', text: reply, lang })
-        speak(reply, lang)
-        return
-      } catch (error) {
-        console.error('ASTRAA backend request failed:', error)
-      }
-
-      const delay = 350 + Math.random() * 450
-      setTimeout(() => {
-        const { telemetry, activeFaults, log } = stateRef.current
-        const { text: reply, lastFaultId } = answerQuery({
-          text: rawText,
-          lang,
-          telemetry,
-          activeFaults,
-          log,
-          context: contextRef.current,
-        })
-        contextRef.current = { lastFaultId }
-        setThinking(false)
-        onTranscriptEntry?.({ from: 'astraa', text: reply, lang })
-        speak(reply, lang)
-      }, delay)
+      const { telemetry, activeFaults, log } = stateRef.current
+      const { text: reply, lastFaultId } = answerQuery({
+        text: rawText,
+        lang,
+        telemetry,
+        activeFaults,
+        log,
+        context: contextRef.current,
+      })
+      contextRef.current = { lastFaultId }
+      onTranscriptEntry?.({ from: 'astraa', text: reply, lang })
+      speak(reply, lang)
     },
     [onTranscriptEntry, speak]
   )
@@ -204,7 +176,7 @@ export function useVoiceAssistant({ telemetry, activeFaults, log, onTranscriptEn
     awake,
     lastHeard,
     speaking,
-    thinking,
+    thinking: false,
     micEnabled,
     enableMic,
     disableMic,

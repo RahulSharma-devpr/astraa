@@ -5,6 +5,24 @@ import { SUBSYSTEMS } from '../utils/anomalyEngine'
 
 const HEALTH_COLOR = { nominal: 0x3ed6c4, warning: 0xf2a63d, critical: 0xff5c5c }
 const HEALTH_CSS = { nominal: 'nominal', warning: 'warning', critical: 'critical' }
+const PART_LABELS = {
+  satellite: {
+    power: 'Solar arrays / EPS',
+    thermal: 'Radiator',
+    comms: 'Dish antenna',
+    propulsion: 'RCS thrusters',
+    attitude: 'Attitude control',
+    payload: 'Payload instrument',
+  },
+  spacecraft: {
+    power: 'Power bus / EPS',
+    thermal: 'Radiator fin',
+    comms: 'Communications antenna',
+    propulsion: 'Main engine cluster',
+    attitude: 'RCS jets',
+    payload: 'Payload pod',
+  },
+}
 
 // ---- Unmanned-satellite hull (unchanged from original) ----
 function buildSatelliteModel() {
@@ -193,7 +211,15 @@ function buildSpacecraftModel() {
   craft.add(radiator)
 
   // Rear engine cluster — 3 faceted nozzles with glowing exhaust
-  const engineGeo = new THREE.CylinderGeometry(0.14, 0.22, 0.5, 6)
+  const engineGeo = new THREE.CylinderGeometry(0.18, 0.3, 0.56, 12, 1, true)
+  const engineMat = new THREE.MeshStandardMaterial({
+    color: 0x3b4850,
+    metalness: 0.82,
+    roughness: 0.28,
+    side: THREE.DoubleSide,
+  })
+  const nozzleRimGeo = new THREE.TorusGeometry(0.285, 0.035, 8, 16)
+  const nozzleRimMat = new THREE.MeshStandardMaterial({ color: 0x9b805e, metalness: 0.74, roughness: 0.3 })
   const flames = []
   const enginePositions = [
     [0, 0.3],
@@ -201,20 +227,24 @@ function buildSpacecraftModel() {
     [0.32, -0.15],
   ]
   enginePositions.forEach(([x, z]) => {
-    const engine = new THREE.Mesh(engineGeo, trimMat)
+    const engine = new THREE.Mesh(engineGeo, engineMat)
     engine.position.set(x, -2.4, z)
     craft.add(engine)
+    const nozzleRim = new THREE.Mesh(nozzleRimGeo, nozzleRimMat)
+    nozzleRim.position.set(x, -2.68, z)
+    nozzleRim.rotation.x = Math.PI / 2
+    craft.add(nozzleRim)
     const flame = new THREE.Mesh(
       new THREE.ConeGeometry(0.11, 0.4, 6),
       new THREE.MeshBasicMaterial({ color: 0x9fdcff, transparent: true, opacity: 0.58 })
     )
-    flame.position.set(x, -2.85, z)
+    flame.position.set(x, -2.88, z)
     craft.add(flame)
     flames.push(flame)
   })
 
   const nodePositions = {
-    power: new THREE.Vector3(2.6, -0.75, 0),
+    power: new THREE.Vector3(-0.42, -0.7, 0.38),
     attitude: new THREE.Vector3(0.55, 0.85, 0.15),
     comms: new THREE.Vector3(0, -0.32, -0.85),
     payload: new THREE.Vector3(0, -0.2, 0.65),
@@ -468,7 +498,7 @@ export default function DigitalTwin({ subsystemHealth }) {
             ref={(el) => (labelRefs.current[s.id] = el)}
             className={`twin3d-label health-${HEALTH_CSS[subsystemHealth[s.id]]}`}
           >
-            {s.label}
+            {PART_LABELS[craftType][s.id] || s.label}
           </div>
         ))}
       </div>
